@@ -10,6 +10,7 @@ import com.example.icardbackend.common.exception.UserException.UserNotFoundExcep
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -119,5 +120,12 @@ public class GlobalExceptionHandler {
             NoActiveAttendanceException ex, HttpServletRequest request) {
         ErrorResponse error = buildError(HttpStatus.BAD_REQUEST, ex.getMessage(), request);
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ErrorResponse> handleAccessDenied(
+            AccessDeniedException ex, HttpServletRequest request) {
+        ErrorResponse error = buildError(HttpStatus.FORBIDDEN, "Bu işlem için yetkiniz yok.", request);
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error);
     }
 }

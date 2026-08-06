@@ -30,7 +30,21 @@ public class User {
     @Column(nullable = false)
     private String password;
 
+    @Column(nullable = false, updatable = false)
     private LocalDateTime createdDate;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    @Builder.Default
+    private RoleType role = RoleType.EMPLOYEE;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "manager_id")
+    private User manager;
+
+    @Column(nullable = false)
+    @Builder.Default
+    private Boolean active = true;
 
     @PrePersist
     protected void onCreate() {

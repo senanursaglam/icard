@@ -9,6 +9,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 
@@ -29,6 +30,12 @@ public class UserController{
     public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
         AuthResponse response = userService.login(request);
         return ResponseEntity.ok(response);
+    }
+    
+    @GetMapping("/admin-test")
+    @PreAuthorize("hasRole('ADMIN')")
+    public String adminOnlyTest() {
+        return "Bu mesajı sadece ADMIN görebilir.";
     }
 }
 
