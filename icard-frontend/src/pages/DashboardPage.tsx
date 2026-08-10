@@ -233,6 +233,12 @@ const handleTableChange = (pagination: any) => {
   return d.toLocaleDateString("tr-TR", { day: "2-digit", month: "2-digit", year: "numeric" });
   };
 
+  const chartData = weeklyChart.map((d) => ({
+  day: d.day,
+  hours: d.hours,
+  status: d.isLeave ? "İzinli" : "Çalışma",
+  }));
+
 
   return (
     <div style={{ maxWidth: 1000, margin: "40px auto", padding: "0 20px" }}>
@@ -254,7 +260,7 @@ const handleTableChange = (pagination: any) => {
 
       {/* Stat Kartları */}
       <Row gutter={16} style={{ marginBottom: 24 }}>
-        <Col span={5}>
+        <Col span={4}>
           <Card style={{ height: 120 }}>
             <Statistic
               title="Bugünkü Süre" 
@@ -265,7 +271,7 @@ const handleTableChange = (pagination: any) => {
           </Card>
         </Col>
 
-        <Col span={5}>
+        <Col span={4}>
           <Card style={{ height: 120 }}>
             <Statistic
               title="Haftalık Süre"
@@ -276,7 +282,7 @@ const handleTableChange = (pagination: any) => {
           </Card>
         </Col>
 
-        <Col span={4.92}>
+        <Col span={4}>
           <Card style={{ height: 120 }}>
             <Statistic
               title="Haftalık Giriş"
@@ -285,7 +291,7 @@ const handleTableChange = (pagination: any) => {
           </Card>
         </Col>
 
-        <Col span={4.92}>
+        <Col span={4}>
           <Card style={{ height: 120 }}>
             <Statistic
               title="Haftalık Çıkış"
@@ -294,7 +300,7 @@ const handleTableChange = (pagination: any) => {
           </Card>
         </Col>
 
-        <Col span={5}>
+        <Col span={4}>
           <Card style={{ height: 120 }}>
             <Statistic
               title="Toplam Süre"
@@ -304,6 +310,11 @@ const handleTableChange = (pagination: any) => {
             />
           </Card>
         </Col>
+        <Col span={4}>
+  <Card>
+    <Statistic title="Bu Hafta İzinli Gün" value={stats?.weeklyLeaveDayCount ?? 0} />
+  </Card>
+</Col>
       </Row>
 
         <Card style={{ marginBottom: 24 }}>
@@ -392,7 +403,19 @@ const handleTableChange = (pagination: any) => {
             )}
           </Row>
 
-          <Column data={weeklyChart} xField="day" yField="hours" height={250} />
+          <Column
+            data={chartData}
+            xField="day"
+            yField="hours"
+            colorField="status"
+            height={250}
+            tooltip={{
+              formatter: (datum: { day: string; hours: number; status: string }) => ({
+                name: datum.status,
+                value: datum.status === "İzinli" ? "İzinli" : `${datum.hours} saat`,
+              }),
+            }}
+          />
         </Card>
     
 

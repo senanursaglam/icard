@@ -5,6 +5,8 @@ import com.example.icardbackend.attendance.dto.DashboardStatsResponse;
 import com.example.icardbackend.attendance.dto.WeeklyChartResponse;
 import com.example.icardbackend.attendance.entity.Attendance;
 import com.example.icardbackend.attendance.repository.AttendanceRepository;
+import com.example.icardbackend.leave.entity.LeaveRequest;
+import com.example.icardbackend.leave.repository.LeaveRequestRepository;
 import com.example.icardbackend.user.entity.User;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -13,25 +15,22 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.DayOfWeek;
 import java.time.temporal.TemporalAdjusters;
-import java.util.ArrayList;
-import java.util.EnumMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 @Service
 @RequiredArgsConstructor
 public class DashboardService {
 
     private final AttendanceRepository attendanceRepository;
+    private final LeaveRequestRepository leaveRequestRepository;
 
     public DashboardStatsResponse getStats(User user) {
 
         LocalDateTime todayStart = LocalDate.now().atStartOfDay();
         LocalDateTime todayEnd = todayStart.plusDays(1);
 
-        LocalDateTime weekStart = LocalDate.now()
-                .with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
-                .atStartOfDay();
+        LocalDate weekStartDate = LocalDate.now().with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
+        LocalDateTime weekStart = weekStartDate.atStartOfDay();
         LocalDateTime weekEnd = weekStart.plusWeeks(1);
 
         Long todayMinutes = attendanceRepository.sumWorkedMinutesBetween(user, todayStart, todayEnd);
@@ -40,12 +39,15 @@ public class DashboardService {
         Long weeklyCheckOuts = attendanceRepository.countCheckOutsBetween(user, weekStart, weekEnd);
         Long totalMinutes = attendanceRepository.sumAllWorkedMinutes(user);
 
+        Set<LocalDate> leaveDates = getApprovedLeaveDates(user, weekStartDate, weekStartDate.plusDays(6));
+
         return DashboardStatsResponse.builder()
                 .todayWorkedHours(minutesToHours(todayMinutes))
                 .weeklyWorkedHours(minutesToHours(weeklyMinutes))
                 .weeklyCheckInCount(weeklyCheckIns)
                 .weeklyCheckOutCount(weeklyCheckOuts)
                 .totalWorkedHours(minutesToHours(totalMinutes))
+                .weeklyLeaveDayCount(leaveDates.size())
                 .build();
     }
 
@@ -79,15 +81,25 @@ public class DashboardService {
             }
         }
 
+        Set<LocalDate> leaveDates = getApprovedLeaveDates(user, weekStartDate, weekStartDate.plusDays(6));
+
         String[] labels = {"Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Pazar"};
         DayOfWeek[] order = {DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
                 DayOfWeek.THURSDAY, DayOfWeek.FRIDAY, DayOfWeek.SATURDAY, DayOfWeek.SUNDAY};
 
         List<DailyHoursResponse> days = new ArrayList<>();
         for (int i = 0; i < order.length; i++) {
+            LocalDate currentDate = weekStartDate.plusDays(i);
+            boolean isLeave = leaveDates.contains(currentDate);
+
             Long minutes = minutesByDay.get(order[i]);
             double hours = Math.round((minutes / 60.0) * 100.0) / 100.0;
-            days.add(DailyHoursResponse.builder().day(labels[i]).hours(hours).build());
+
+            days.add(DailyHoursResponse.builder()
+                    .day(labels[i])
+                    .hours(isLeave && hours == 0 ? 8.0 : hours) // izinliyse ve hiç çalışılmamışsa sembolik 8 saat göster
+                    .isLeave(isLeave)
+                    .build());
         }
 
         return WeeklyChartResponse.builder()
@@ -96,4 +108,23 @@ public class DashboardService {
                 .days(days)
                 .build();
     }
+
+    private Set<LocalDate> getApprovedLeaveDates(User user, LocalDate weekStart, LocalDate weekEnd) {
+        List<LeaveRequest> approvedLeaves = leaveRequestRepository.findApprovedOverlapping(
+                user, weekStart, weekEnd);
+
+        Set<LocalDate> leaveDates = new HashSet<>();
+        for (LeaveRequest leave : approvedLeaves) {
+            LocalDate current = leave.getStartDate().isBefore(weekStart) ? weekStart : leave.getStartDate();
+            LocalDate end = leave.getEndDate().isAfter(weekEnd) ? weekEnd : leave.getEndDate();
+
+            while (!current.isAfter(end)) {
+                leaveDates.add(current);
+                current = current.plusDays(1);
+            }
+        }
+
+        return leaveDates;
+    }
+
 }

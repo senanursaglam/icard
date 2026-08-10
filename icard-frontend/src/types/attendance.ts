@@ -15,6 +15,7 @@ export interface DashboardStatsResponse {
   weeklyCheckInCount: number;
   weeklyCheckOutCount: number;
   totalWorkedHours: number;
+  weeklyLeaveDayCount: number;
 }
 
 export interface PageResponse<T> {
@@ -28,6 +29,7 @@ export interface PageResponse<T> {
 export interface DailyHoursResponse {
   day: string;
   hours: number;
+  isLeave: boolean;
 }
 
 export type FilterOperator = "EQ" | "LIKE" | "IN" | "BETWEEN" | "DATE_BETWEEN";
