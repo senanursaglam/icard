@@ -4,6 +4,9 @@ import com.example.icardbackend.common.exception.AttendanceException.ActiveAtten
 import com.example.icardbackend.common.exception.AttendanceException.NoActiveAttendanceException;
 import com.example.icardbackend.common.exception.DepartmentException.DepartmentAlreadyExistsException;
 import com.example.icardbackend.common.exception.DepartmentException.DepartmentNotFoundException;
+import com.example.icardbackend.common.exception.LeaveRequestException.LeaveAlreadyDecidedException;
+import com.example.icardbackend.common.exception.LeaveRequestException.LeaveOverlapException;
+import com.example.icardbackend.common.exception.LeaveRequestException.LeaveRequestNotFoundException;
 import com.example.icardbackend.common.exception.UserException.EmailAlreadyExistsException;
 import com.example.icardbackend.common.exception.QrException.QrAlreadyUsedException;
 import com.example.icardbackend.common.exception.QrException.QrExpiredException;
@@ -140,5 +143,23 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleDepartmentNotFound(
             DepartmentNotFoundException ex, HttpServletRequest request){
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(buildError(HttpStatus.NOT_FOUND, ex.getMessage(), request));
+    }
+
+    @ExceptionHandler(LeaveRequestNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleLeaveRequestNotFound(
+            LeaveRequestNotFoundException ex, HttpServletRequest request) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(buildError(HttpStatus.NOT_FOUND, ex.getMessage(), request));
+    }
+
+    @ExceptionHandler(LeaveOverlapException.class)
+    public ResponseEntity<ErrorResponse> handleLeaveOverlap(
+            LeaveOverlapException ex, HttpServletRequest request) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(buildError(HttpStatus.CONFLICT, ex.getMessage(), request));
+    }
+
+    @ExceptionHandler(LeaveAlreadyDecidedException.class)
+    public ResponseEntity<ErrorResponse> handleLeaveAlreadyDecided(
+            LeaveAlreadyDecidedException ex, HttpServletRequest request) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(buildError(HttpStatus.CONFLICT, ex.getMessage(), request));
     }
 }
