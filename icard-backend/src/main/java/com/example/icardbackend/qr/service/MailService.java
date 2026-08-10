@@ -10,6 +10,7 @@ import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
 import org.springframework.core.io.ByteArrayResource;
 import java.io.IOException;
+import java.time.LocalDate;
 
 @Service
 @RequiredArgsConstructor
@@ -43,6 +44,48 @@ public class MailService {
 
         } catch (MessagingException | WriterException | IOException e) {
             throw new RuntimeException("QR kod maili gönderilemedi: " + e.getMessage(), e);
+        }
+    }
+    public void sendLeaveRequestNotificationToManager(String managerEmail, String employeeFullName,
+                                                      LocalDate startDate, LocalDate endDate) {
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true);
+
+            helper.setTo(managerEmail);
+            helper.setSubject("Yeni İzin Talebi - " + employeeFullName);
+            helper.setText(
+                    "<h3>Yeni bir izin talebi onayınızı bekliyor</h3>" +
+                            "<p><b>Personel:</b> " + employeeFullName + "</p>" +
+                            "<p><b>Tarih Aralığı:</b> " + startDate + " - " + endDate + "</p>",
+                    true
+            );
+
+            mailSender.send(message);
+        } catch (MessagingException e) {
+            throw new RuntimeException("İzin talebi maili gönderilemedi: " + e.getMessage(), e);
+        }
+    }
+
+    public void sendLeaveDecisionNotification(String employeeEmail, boolean approved,
+                                              LocalDate startDate, LocalDate endDate) {
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true);
+
+            String statusText = approved ? "onaylandı" : "reddedildi";
+
+            helper.setTo(employeeEmail);
+            helper.setSubject("İzin Talebiniz " + (approved ? "Onaylandı" : "Reddedildi"));
+            helper.setText(
+                    "<h3>İzin talebiniz " + statusText + "</h3>" +
+                            "<p><b>Tarih Aralığı:</b> " + startDate + " - " + endDate + "</p>",
+                    true
+            );
+
+            mailSender.send(message);
+        } catch (MessagingException e) {
+            throw new RuntimeException("İzin karar maili gönderilemedi: " + e.getMessage(), e);
         }
     }
 }
