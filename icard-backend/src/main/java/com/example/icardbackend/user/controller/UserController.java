@@ -31,11 +31,5 @@ public class UserController{
         AuthResponse response = userService.login(request);
         return ResponseEntity.ok(response);
     }
-    
-    @GetMapping("/admin-test")
-    @PreAuthorize("hasRole('ADMIN')")
-    public String adminOnlyTest() {
-        return "Bu mesajı sadece ADMIN görebilir.";
-    }
 }
 

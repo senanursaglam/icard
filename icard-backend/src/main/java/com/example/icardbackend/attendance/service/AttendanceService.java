@@ -18,6 +18,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.List;
 
 
 @Service
@@ -90,6 +91,18 @@ public class AttendanceService {
     }
 
     public boolean hasActiveAttendance(User user) {
-     return attendanceRepository.findByUserAndLogoutTimeIsNull(user).isPresent();
+        return attendanceRepository.findByUserAndLogoutTimeIsNull(user).isPresent();
+    }
+
+    public Page<Attendance> filterTeamAttendance(List<User> team, AttendanceFilterRequest request) {
+
+        if (team.isEmpty()) {
+            return Page.empty();
+        }
+
+        Specification<Attendance> spec = specificationBuilder.buildForTeam(team, request.getFilters());
+        Pageable pageable = buildPageable(request);
+
+        return attendanceRepository.findAll(spec, pageable);
     }
 }

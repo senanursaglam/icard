@@ -18,4 +18,7 @@ public class UserResponse { //frontende dönecek kullanıcı bilgisi
     private String email;
     private LocalDateTime createdDate;
     private RoleType role;
+    private String departmentName;
+    private String managerName;
+    private Boolean active;
 }

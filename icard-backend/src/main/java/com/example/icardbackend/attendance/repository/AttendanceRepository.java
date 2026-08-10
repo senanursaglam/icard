@@ -1,16 +1,19 @@
 package com.example.icardbackend.attendance.repository;
 
 import com.example.icardbackend.attendance.entity.Attendance;
+import com.example.icardbackend.attendance.specification.AttendanceSpecificationBuilder;
+import com.example.icardbackend.common.specification.FilterCriteria;
 import com.example.icardbackend.user.entity.User;
+import jakarta.persistence.criteria.Predicate;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
-import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
-
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -49,6 +52,33 @@ public interface AttendanceRepository extends JpaRepository<Attendance, Long>,
     Long sumAllWorkedMinutes(@Param("user") User user);
 
     List<Attendance> findByUserAndLoginTimeBetween(User user, LocalDateTime start, LocalDateTime end);
+
+    default Specification<Attendance> buildForManagerTeam(List<User> teamMembers, List<FilterCriteria> filters) {
+        return (root, query, cb) -> {
+            List<Predicate> predicates = new ArrayList<>();
+            predicates.add(root.get("user").in(teamMembers));
+
+            if (filters != null) {
+                for (FilterCriteria criteria : filters) {
+                    Predicate predicate = AttendanceSpecificationBuilder.toPredicate(root, cb, criteria);
+                    if (predicate != null) predicates.add(predicate);
+                }
+            }
+
+            return cb.and(predicates.toArray(new Predicate[0]));
+        };
+    }
+
+    @Query("SELECT COALESCE(SUM(a.workedMinutes), 0) FROM Attendance a " +
+            "WHERE a.user IN :users AND a.workedMinutes IS NOT NULL")
+    Long sumAllWorkedMinutesForUsers(@Param("users") List<User> users);
+
+    @Query("SELECT COALESCE(SUM(a.workedMinutes), 0) FROM Attendance a " +
+            "WHERE a.user IN :users AND a.loginTime >= :start AND a.loginTime < :end " +
+            "AND a.workedMinutes IS NOT NULL")
+    Long sumWorkedMinutesForUsersBetween(@Param("users") List<User> users,
+                                         @Param("start") LocalDateTime start,
+                                         @Param("end") LocalDateTime end);
 }
 
 

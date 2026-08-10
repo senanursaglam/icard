@@ -37,7 +37,7 @@ public class AttendanceSpecificationBuilder {
         };
     }
 
-    private Predicate toPredicate(jakarta.persistence.criteria.Root<Attendance> root,
+    public static Predicate toPredicate(jakarta.persistence.criteria.Root<Attendance> root,
                                   jakarta.persistence.criteria.CriteriaBuilder cb,
                                   FilterCriteria criteria) {
 
@@ -76,6 +76,25 @@ public class AttendanceSpecificationBuilder {
 
                 yield cb.between(root.get(field), start, end);
             }
+        };
+    }
+    public Specification<Attendance> buildForTeam(List<User> teamMembers, List<FilterCriteria> filters) {
+
+        return (root, query, cb) -> {
+
+            List<Predicate> predicates = new ArrayList<>();
+            predicates.add(root.get("user").in(teamMembers));
+
+            if (filters != null) {
+                for (FilterCriteria criteria : filters) {
+                    Predicate predicate = toPredicate(root, cb, criteria);
+                    if (predicate != null) {
+                        predicates.add(predicate);
+                    }
+                }
+            }
+
+            return cb.and(predicates.toArray(new Predicate[0]));
         };
     }
 }

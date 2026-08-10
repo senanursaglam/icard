@@ -2,6 +2,8 @@ package com.example.icardbackend.common;
 
 import com.example.icardbackend.common.exception.AttendanceException.ActiveAttendanceExistsException;
 import com.example.icardbackend.common.exception.AttendanceException.NoActiveAttendanceException;
+import com.example.icardbackend.common.exception.DepartmentException.DepartmentAlreadyExistsException;
+import com.example.icardbackend.common.exception.DepartmentException.DepartmentNotFoundException;
 import com.example.icardbackend.common.exception.UserException.EmailAlreadyExistsException;
 import com.example.icardbackend.common.exception.QrException.QrAlreadyUsedException;
 import com.example.icardbackend.common.exception.QrException.QrExpiredException;
@@ -127,5 +129,16 @@ public class GlobalExceptionHandler {
             AccessDeniedException ex, HttpServletRequest request) {
         ErrorResponse error = buildError(HttpStatus.FORBIDDEN, "Bu işlem için yetkiniz yok.", request);
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error);
+    }
+
+    @ExceptionHandler(DepartmentAlreadyExistsException.class)
+    public ResponseEntity<ErrorResponse> handleDepartmentAlreadyExists(
+            DepartmentAlreadyExistsException ex, HttpServletRequest request){
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(buildError(HttpStatus.CONFLICT, ex.getMessage(), request));
+    }
+    @ExceptionHandler(DepartmentNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleDepartmentNotFound(
+            DepartmentNotFoundException ex, HttpServletRequest request){
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(buildError(HttpStatus.NOT_FOUND, ex.getMessage(), request));
     }
 }

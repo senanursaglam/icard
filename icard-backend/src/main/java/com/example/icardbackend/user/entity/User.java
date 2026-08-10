@@ -1,5 +1,6 @@
 package com.example.icardbackend.user.entity;
 
+import com.example.icardbackend.department.entity.Department;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -50,4 +51,8 @@ public class User {
     protected void onCreate() {
         this.createdDate = LocalDateTime.now();
     }
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "department_id")
+    private Department department;
 }

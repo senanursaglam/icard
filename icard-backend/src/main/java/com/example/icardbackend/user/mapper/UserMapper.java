@@ -17,7 +17,6 @@ public class UserMapper {
                 .password(encodedPassword) //user serviceden hashlenmiş passwordu alır
                 .build();
     }
-
     public UserResponse toResponse(User user) { //User entitysini frontende direkt göndermek
         // yerine UserResponsea çeviriyoruz
         return UserResponse.builder()
@@ -27,8 +26,11 @@ public class UserMapper {
                 .email(user.getEmail())
                 .createdDate(user.getCreatedDate())
                 .role(user.getRole())
+                .departmentName(user.getDepartment() != null ? user.getDepartment().getName() : null)
+                .managerName(user.getManager() != null
+                        ? user.getManager().getFirstName() + " " + user.getManager().getLastName()
+                        : null)
+                .active(user.getActive())
                 .build();
-
-
     }
 }
