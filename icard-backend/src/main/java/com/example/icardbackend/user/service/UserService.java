@@ -1,8 +1,14 @@
 package com.example.icardbackend.user.service;
 
+import com.example.icardbackend.attendance.entity.Attendance;
+import com.example.icardbackend.attendance.mapper.AttendanceMapper;
+import com.example.icardbackend.attendance.repository.AttendanceRepository;
 import com.example.icardbackend.common.exception.DepartmentException.DepartmentNotFoundException;
+import com.example.icardbackend.common.specification.FilterCriteria;
 import com.example.icardbackend.department.entity.Department;
 import com.example.icardbackend.department.repository.DepartmentRepository;
+import com.example.icardbackend.leave.entity.LeaveStatus;
+import com.example.icardbackend.leave.repository.LeaveRequestRepository;
 import com.example.icardbackend.security.jwt.JwtService;
 import com.example.icardbackend.security.userdetails.CustomUserDetails;
 import com.example.icardbackend.user.dto.*;
@@ -10,7 +16,13 @@ import com.example.icardbackend.user.entity.RoleType;
 import com.example.icardbackend.user.entity.User;
 import com.example.icardbackend.user.mapper.UserMapper;
 import com.example.icardbackend.user.repository.UserRepository;
+import com.example.icardbackend.user.specification.UserSpecificationBuilder;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -31,6 +43,10 @@ public class UserService {
     private final AuthenticationManager authenticationManager;
     private final JwtService jwtService;
     private final DepartmentRepository departmentRepository;
+    private final UserSpecificationBuilder userSpecificationBuilder;
+    private final AttendanceRepository attendanceRepository;
+    private final AttendanceMapper attendanceMapper;
+    private final LeaveRequestRepository leaveRequestRepository;
 
 
     public UserResponse register(RegisterRequest request) {
@@ -75,14 +91,16 @@ public class UserService {
             throw new EmailAlreadyExistsException("Bu email adresi zaten kayıtlı: " + request.getEmail());
         }
 
+        Department department = resolveDepartment(request.getDepartmentId());
+
         User user = User.builder()
                 .firstName(request.getFirstName())
                 .lastName(request.getLastName())
                 .email(request.getEmail())
                 .password(passwordEncoder.encode(request.getPassword()))
                 .role(request.getRole() != null ? request.getRole() : RoleType.EMPLOYEE)
-                .department(resolveDepartment(request.getDepartmentId()))
-                .manager(resolveManager(request.getManagerId()))
+                .department(department)
+                .manager(department != null ? department.getManager() : null)
                 .active(true)
                 .build();
 
@@ -97,8 +115,12 @@ public class UserService {
         if (request.getFirstName() != null) user.setFirstName(request.getFirstName());
         if (request.getLastName() != null) user.setLastName(request.getLastName());
         if (request.getRole() != null) user.setRole(request.getRole());
-        if (request.getDepartmentId() != null) user.setDepartment(resolveDepartment(request.getDepartmentId()));
-        if (request.getManagerId() != null) user.setManager(resolveManager(request.getManagerId()));
+
+        if (request.getDepartmentId() != null) {
+            Department department = resolveDepartment(request.getDepartmentId());
+            user.setDepartment(department);
+            user.setManager(department != null ? department.getManager() : null);
+        }
 
         return userMapper.toResponse(userRepository.save(user));
     }
@@ -109,9 +131,10 @@ public class UserService {
         user.setActive(false);
         userRepository.save(user);
     }
-
-    public List<UserResponse> adminGetAllUsers() {
-        return userRepository.findAll().stream().map(userMapper::toResponse).toList();
+    public Page<UserResponse> adminGetAllUsers(int page, int size, List<FilterCriteria> filters) {
+        Specification<User> spec = userSpecificationBuilder.build(filters);
+        Pageable pageable = PageRequest.of(page, size);
+        return userRepository.findAll(spec, pageable).map(userMapper::toResponse);
     }
 
     private Department resolveDepartment(Long departmentId) {
@@ -134,5 +157,36 @@ public class UserService {
 
     public List<User> getTeamEntities(User manager) {
         return userRepository.findByManager(manager);
+    }
+
+    public EmployeeDetailResponse getEmployeeDetail(Long employeeId, User requester) {
+
+        User employee = userRepository.findById(employeeId)
+                .orElseThrow(() -> new UserNotFoundException("Kullanıcı bulunamadı: " + employeeId));
+
+        boolean isOwnTeamMember = employee.getManager() != null
+                && employee.getManager().getId().equals(requester.getId());
+        boolean isAdmin = requester.getRole() == RoleType.ADMIN;
+
+        if (!isOwnTeamMember && !isAdmin) {
+            throw new AccessDeniedException("Sadece kendi ekibinizdeki personelin detaylarını görüntüleyebilirsiniz.");
+        }
+
+        List<Attendance> recentAttendance = attendanceRepository
+                .findByUserOrderByLoginTimeDesc(employee, PageRequest.of(0, 10));
+
+        Long overtimeMinutes = attendanceRepository.sumAllOvertimeMinutesForUser(employee);
+        long lateCount = attendanceRepository.countAllLateForUser(employee);
+        long pendingLeaves = leaveRequestRepository.findByUser(employee).stream()
+                .filter(lr -> lr.getStatus() == LeaveStatus.PENDING)
+                .count();
+
+        return EmployeeDetailResponse.builder()
+                .user(userMapper.toResponse(employee))
+                .recentAttendance(recentAttendance.stream().map(attendanceMapper::toAttendanceResponse).toList())
+                .totalOvertimeHours(overtimeMinutes != null ? Math.round((overtimeMinutes / 60.0) * 100.0) / 100.0 : 0.0)
+                .lateCount(lateCount)
+                .pendingLeaveCount((int) pendingLeaves)
+                .build();
     }
 }

@@ -4,6 +4,8 @@ import LoginPage from "../pages/LoginPage";
 import RegisterPage from "../pages/RegisterPage";
 import DashboardPage from "../pages/DashboardPage";
 import QrScanPage from "../pages/QrScanPage";
+import ManagerTeamPage from "../pages/ManagerTeamPage";
+import AdminPage from "../pages/AdminPage";
 
 const AppRouter = () => {
   return (
@@ -27,6 +29,22 @@ const AppRouter = () => {
             <QrScanPage />
             </ProtectedRoute>
         }
+        />
+        <Route
+          path="/manager/team"
+          element={
+            <ProtectedRoute allowedRoles={["MANAGER"]}>
+              <ManagerTeamPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin"
+          element={
+            <ProtectedRoute allowedRoles={["ADMIN"]}>
+              <AdminPage />
+            </ProtectedRoute>
+          }
         />
       </Routes>
     </BrowserRouter>

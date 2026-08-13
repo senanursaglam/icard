@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Card, Col, Row, Table, Statistic, Button, Spin, message } from "antd";
+import { Card, Col, Row, Table, Statistic, Button, Spin, message, Space, Tag, Modal, Form, Input } from "antd";
 import { Column } from "@ant-design/charts";
 import { useAuth } from "../context/AuthContext";
 import { getActiveStatus, getDashboardStats, getWeeklyChart } from "../service/attendanceApi";
@@ -12,6 +12,11 @@ import { filterAttendance } from "../service/attendanceApi";
 import type { AttendanceFilterRequest, FilterCriteria } from "../types/attendance";
 import dayjs from "dayjs";
 import { CaretUpOutlined, CaretDownOutlined } from "@ant-design/icons";
+import type { LeaveRequestResponse } from "../types/leave";
+import { createLeaveRequest, getMyLeaves } from "../service/leaveApi";
+import { getDepartments } from "../service/adminApi";
+import { getDepartmentWeeklyChart } from "../service/attendanceApi";
+import type { DepartmentResponse } from "../types/admin";
 
 const { RangePicker } = DatePicker;
 const DashboardPage = () => {
@@ -29,6 +34,13 @@ const DashboardPage = () => {
   const [dateRange, setDateRange] = useState<[string, string] | null>(null);
   const [sortOption, setSortOption] = useState<string>("loginTime,desc");
   const [weekOffset, setWeekOffset] = useState(0);
+  const [myLeaves, setMyLeaves] = useState<LeaveRequestResponse[]>([]);
+  const [leaveModalOpen, setLeaveModalOpen] = useState(false);
+  const [leaveForm] = Form.useForm();
+  const [lateFilter, setLateFilter] = useState<string | undefined>(undefined);
+  const [departments, setDepartments] = useState<DepartmentResponse[]>([]);
+  const [selectedDepartmentId, setSelectedDepartmentId] = useState<number | undefined>(undefined);
+
 
   useEffect(() => {
   fetchStats();
@@ -40,7 +52,7 @@ useEffect(() => {
 
 useEffect(() => {
   fetchAttendance();
-}, [page, pageSize, statusFilter, dateRange, sortOption]);
+}, [page, pageSize, statusFilter, dateRange, sortOption, lateFilter]);
 
 
 const navigate = useNavigate();
@@ -73,10 +85,47 @@ const handleCheckOut = async () => {
   }
 };
 
+useEffect(() => {
+  fetchMyLeaves();
+}, []);
+
+const fetchMyLeaves = async () => {
+  try {
+    const data = await getMyLeaves();
+    setMyLeaves(data);
+  } catch {
+    message.error("İzin talepleriniz yüklenemedi.");
+  }
+};
+
+const handleLeaveSubmit = async () => {
+  try {
+    const values = await leaveForm.validateFields();
+    const [start, end] = values.dateRange;
+
+    await createLeaveRequest({
+      startDate: start.format("YYYY-MM-DD"),
+      endDate: end.format("YYYY-MM-DD"),
+      leaveType: values.leaveType,
+      reason: values.reason,
+    });
+
+    message.success("İzin talebiniz oluşturuldu.");
+    setLeaveModalOpen(false);
+    leaveForm.resetFields();
+    fetchMyLeaves();
+  } catch (err: any) {
+    if (err?.errorFields) return;
+    message.error(err.response?.data?.message || "İzin talebi oluşturulamadı.");
+  }
+};
+
 
 const fetchWeeklyChart = async () => {
   try {
-    const data = await getWeeklyChart(weekOffset);
+    const data = selectedDepartmentId
+      ? await getDepartmentWeeklyChart(selectedDepartmentId, weekOffset)
+      : await getWeeklyChart(weekOffset);
     setWeeklyChart(data.days);
     setWeekRange({ start: data.weekStart, end: data.weekEnd });
   } catch {
@@ -114,12 +163,25 @@ const fetchAttendance = async () => {
       });
     }
 
+    if (lateFilter) {
+      filters.push({ field: "isLate", operator: "EQ", value: lateFilter });
+    }
+
     const request: AttendanceFilterRequest = {
       page,
       size: pageSize,
       sort: sortOption,
       filters,
     };
+
+    const fetchDepartments = async () => {
+  try {
+    const data = await getDepartments();
+    setDepartments(data);
+  } catch {
+    message.error("Departmanlar yüklenemedi.");
+  }
+};
 
     const data = await filterAttendance(request);
 
@@ -162,6 +224,8 @@ const fetchAttendance = async () => {
 const renderSortableTitle = (label: string, field: string) => {
   const [sortField, sortDir] = sortOption.split(",");
   const isActive = sortField === field;
+;
+
 
   return (
     <span
@@ -221,7 +285,42 @@ const renderSortableTitle = (label: string, field: string) => {
     key: "status",
     render: (value: string) => (value === "ACTIVE" ? "Aktif" : "Tamamlandı"),
   },
+  {
+  title: "Geç Giriş",
+  dataIndex: "isLate",
+  key: "isLate",
+  render: (v: boolean) => (v ? <Tag color="red">Geç</Tag> : <Tag color="green">Zamanında</Tag>),
+  },
+  {
+    title: "Erken Çıkış",
+    dataIndex: "isEarlyLeave",
+    key: "isEarlyLeave",
+    render: (v: boolean) => (v ? <Tag color="orange">Erken</Tag> : <Tag color="default">-</Tag>),
+  },
+  {
+    title: "Fazla Mesai",
+    dataIndex: "overtimeMinutes",
+    key: "overtimeMinutes",
+    render: (v: number | null) => (v && v > 0 ? <Tag color="blue">{(v / 60).toFixed(2)} saat</Tag> : "-"),
+  },
 ];
+
+  const leaveColumns: ColumnsType<LeaveRequestResponse> = [
+  { title: "Başlangıç", dataIndex: "startDate", key: "startDate" },
+  { title: "Bitiş", dataIndex: "endDate", key: "endDate" },
+  { title: "Tür", dataIndex: "leaveType", key: "leaveType" },
+  { title: "Açıklama", dataIndex: "reason", key: "reason", render: (v) => v ?? "-" },
+  {
+    title: "Durum",
+    dataIndex: "status",
+    key: "status",
+    render: (v: string) => {
+      const colorMap: Record<string, string> = { PENDING: "gold", APPROVED: "green", REJECTED: "red" };
+      const textMap: Record<string, string> = { PENDING: "Beklemede", APPROVED: "Onaylandı", REJECTED: "Reddedildi" };
+      return <Tag color={colorMap[v]}>{textMap[v]}</Tag>;
+    },
+  },
+]
 
 const handleTableChange = (pagination: any) => {
   if (pagination.current) setPage(pagination.current - 1);
@@ -244,7 +343,18 @@ const handleTableChange = (pagination: any) => {
     <div style={{ maxWidth: 1000, margin: "40px auto", padding: "0 20px" }}>
       <Row justify="space-between" align="middle" style={{ marginBottom: 24 }}>
         <h2>Hoş geldin, {user?.firstName}!</h2>
-        <Button onClick={handleLogout}>Çıkış Yap</Button>
+
+        <Space>
+          {user?.role === "MANAGER" && (
+            <Button type="primary" onClick={() => navigate("/manager/team")}>
+              Ekibim
+            </Button>
+          )}
+
+          <Button onClick={handleLogout}>
+            Çıkış Yap
+          </Button>
+        </Space>
       </Row>
       <Row style={{ marginBottom: 24 }}>
   {hasActiveAttendance ? (
@@ -259,9 +369,9 @@ const handleTableChange = (pagination: any) => {
     </Row>
 
       {/* Stat Kartları */}
-      <Row gutter={16} style={{ marginBottom: 24 }}>
-        <Col span={4}>
-          <Card style={{ height: 120 }}>
+      <Row gutter={[16,16]} style={{ marginBottom: 24}}>
+        <Col span={6}>
+          <Card style={{ height: "100%" }}>
             <Statistic
               title="Bugünkü Süre" 
               value={stats?.todayWorkedHours ?? 0} 
@@ -271,8 +381,8 @@ const handleTableChange = (pagination: any) => {
           </Card>
         </Col>
 
-        <Col span={4}>
-          <Card style={{ height: 120 }}>
+        <Col span={6}>
+          <Card style={{ height: "100%" }}>
             <Statistic
               title="Haftalık Süre"
               value={stats?.weeklyWorkedHours ?? 0}
@@ -282,8 +392,8 @@ const handleTableChange = (pagination: any) => {
           </Card>
         </Col>
 
-        <Col span={4}>
-          <Card style={{ height: 120 }}>
+        <Col span={6}>
+          <Card style={{ height: "100%" }}>
             <Statistic
               title="Haftalık Giriş"
               value={stats?.weeklyCheckInCount ?? 0}
@@ -291,8 +401,8 @@ const handleTableChange = (pagination: any) => {
           </Card>
         </Col>
 
-        <Col span={4}>
-          <Card style={{ height: 120 }}>
+        <Col span={6}>
+          <Card style={{ height: "100%" }}>
             <Statistic
               title="Haftalık Çıkış"
               value={stats?.weeklyCheckOutCount ?? 0}
@@ -300,8 +410,8 @@ const handleTableChange = (pagination: any) => {
           </Card>
         </Col>
 
-        <Col span={4}>
-          <Card style={{ height: 120 }}>
+        <Col span={6}>
+          <Card style={{ height: "100%" }}>
             <Statistic
               title="Toplam Süre"
               value={stats?.totalWorkedHours ?? 0}
@@ -310,74 +420,27 @@ const handleTableChange = (pagination: any) => {
             />
           </Card>
         </Col>
-        <Col span={4}>
-  <Card>
-    <Statistic title="Bu Hafta İzinli Gün" value={stats?.weeklyLeaveDayCount ?? 0} />
-  </Card>
-</Col>
+          <Col span={6}>
+            <Card style={{ height: "100%" }}>
+            <Statistic title="Bu Hafta İzinli Gün" value={stats?.weeklyLeaveDayCount ?? 0} />
+          </Card>
+        </Col>
+        <Col span={6}>
+          <Card style={{ height: "100%" }}>
+            <Statistic title="Bu Ay Geç Kalma" value={stats?.monthlyLateCount ?? 0} />
+          </Card>
+        </Col>
+        <Col span={6}>
+          <Card style={{ height: "100%" }}>
+            <Statistic title="Bu Ay Fazla Mesai (saat)" value={stats?.monthlyOvertimeHours ?? 0} precision={2} />
+          </Card>
+        </Col>
       </Row>
 
-        <Card style={{ marginBottom: 24 }}>
-  <Row gutter={16}>
-    <Col>
-      <Select
-        placeholder="Duruma göre filtrele"
-        style={{ width: 200 }}
-        allowClear
-        value={statusFilter}
-        onChange={(value) => {
-          setStatusFilter(value);
-          setPage(0);
-        }}
-        options={[
-          { value: "ACTIVE", label: "Aktif" },
-          { value: "COMPLETED", label: "Tamamlandı" },
-        ]}
-      />
-    </Col>
-    <Col>
-      <RangePicker
-        format="DD/MM/YYYY"
-        disabledDate={(current) => current && current > dayjs().endOf("day")}
-        onChange={(dates) => {
-          if (dates && dates[0] && dates[1]) {
-            if (dates[0].isAfter(dayjs().endOf("day")) || dates[1].isAfter(dayjs().endOf("day"))) {
-              message.error("Geçerli bir tarih aralığı giriniz.");
-              setDateRange(null);
-              return;
-            }
-            setDateRange([dates[0].format("YYYY-MM-DD"), dates[1].format("YYYY-MM-DD")]);
-          } else {
-            setDateRange(null);
-          }
-          setPage(0);
-        }}
-      />
-    </Col>
-    <Col>
-      <Select
-        style={{ width: 220 }}
-        value={sortOption}
-        onChange={(value) => {
-          setSortOption(value);
-          setPage(0);
-        }}
-        options={[
-          { value: "loginTime,desc", label: "Giriş: Yeniden Eskiye" },
-          { value: "loginTime,asc", label: "Giriş: Eskiden Yeniye" },
-          { value: "workedHours,desc", label: "Çalışma Süresi: Çoktan Aza" },
-          { value: "workedHours,asc", label: "Çalışma Süresi: Azdan Çoğa" },
-        ]}
-      />
-    </Col>
-  </Row>
-
-
-</Card>
-        <Card style={{ marginBottom: 24 }}>
-          <Row justify="space-between" align="middle" style={{ marginBottom: 4 }}>
+          <Card style={{ marginBottom: 24 }}>
+            <Row justify="space-between" align="middle" style={{ marginBottom: 4 }}>
             <h3 style={{ margin: 0 }}>Haftalık Çalışma Saatleri</h3>
-            <Row gutter={8}>
+            <Row gutter={8} align="middle">
               <Button size="small" onClick={() => setWeekOffset((prev) => prev - 1)}>
                 ← Önceki Hafta
               </Button>
@@ -417,6 +480,80 @@ const handleTableChange = (pagination: any) => {
             }}
           />
         </Card>
+
+        <Card style={{ marginBottom: 24 }}>
+  <Row gutter={16}>
+    <Col>
+      <Select
+        placeholder="Duruma göre filtrele"
+        style={{ width: 200 }}
+        allowClear
+        value={statusFilter}
+        onChange={(value) => {
+          setStatusFilter(value);
+          setPage(0);
+        }}
+        options={[
+          { value: "ACTIVE", label: "Aktif" },
+          { value: "COMPLETED", label: "Tamamlandı" },
+        ]}
+      />
+    </Col>
+    <Col>
+      <RangePicker
+        format="DD/MM/YYYY"
+        disabledDate={(current) => current && current > dayjs().endOf("day")}
+        onChange={(dates) => {
+          if (dates && dates[0] && dates[1]) {
+            if (dates[0].isAfter(dayjs().endOf("day")) || dates[1].isAfter(dayjs().endOf("day"))) {
+              message.error("Geçerli bir tarih aralığı giriniz.");
+              setDateRange(null);
+              return;
+            }
+            setDateRange([dates[0].format("YYYY-MM-DD"), dates[1].format("YYYY-MM-DD")]);
+          } else {
+            setDateRange(null);
+          }
+          setPage(0);
+        }}
+      />
+    </Col>
+
+    <Col>
+      <Select
+        placeholder="Geç kalma durumu"
+        style={{ width: 170 }}
+        allowClear
+        value={lateFilter}
+        onChange={(value) => {
+          setLateFilter(value);
+          setPage(0);
+        }}
+        options={[
+          { value: "true", label: "Sadece Geç Kalanlar" },
+          { value: "false", label: "Sadece Zamanında" },
+        ]}
+      />
+    </Col>
+
+    <Col>
+      <Select
+        style={{ width: 200 }}
+        value={sortOption}
+        onChange={(value) => {
+          setSortOption(value);
+          setPage(0);
+        }}
+        options={[
+          { value: "loginTime,desc", label: "Giriş: Yeniden Eskiye" },
+          { value: "loginTime,asc", label: "Giriş: Eskiden Yeniye" },
+          { value: "workedHours,desc", label: "Çalışma Süresi: Çoktan Aza" },
+          { value: "workedHours,asc", label: "Çalışma Süresi: Azdan Çoğa" },
+        ]}
+      />
+    </Col>
+  </Row>
+</Card>
     
 
       {/* Attendance Tablosu */}
@@ -440,8 +577,49 @@ const handleTableChange = (pagination: any) => {
           />
         )}
       </Card>
+
+      <Card style={{ marginTop: 24 }}>
+        <Row justify="space-between" align="middle" style={{ marginBottom: 16 }}>
+          <h3 style={{ margin: 0 }}>İzinlerim</h3>
+          <Button type="primary" onClick={() => setLeaveModalOpen(true)}>
+            İzin Talebi Oluştur
+          </Button>
+        </Row>
+        <Table columns={leaveColumns} dataSource={myLeaves} rowKey="id" pagination={false} />
+      </Card>
+
+      <Modal
+        title="İzin Talebi Oluştur"
+        open={leaveModalOpen}
+        onOk={handleLeaveSubmit}
+        onCancel={() => setLeaveModalOpen(false)}
+      >
+        <Form form={leaveForm} layout="vertical">
+          <Form.Item name="dateRange" label="Tarih Aralığı" rules={[{ required: true, message: "Tarih aralığı seçiniz" }]}>
+            <RangePicker
+              format="DD/MM/YYYY"
+              disabledDate={(current) => current && current < dayjs().startOf("day")}
+            />
+          </Form.Item>
+          <Form.Item name="leaveType" label="İzin Türü" rules={[{ required: true }]}>
+            <Select
+              options={[
+                { value: "ANNUAL", label: "Yıllık İzin" },
+                { value: "EXCUSE", label: "Mazeret İzni" },
+                { value: "SICK", label: "Rapor" },
+              ]}
+            />
+          </Form.Item>
+          <Form.Item name="reason" label="Açıklama (opsiyonel)">
+            <Input.TextArea rows={3} />
+          </Form.Item>
+        </Form>
+      </Modal>
     </div>
+
+    
   );
+  
 };
 
 export default DashboardPage;

@@ -4,6 +4,7 @@ import com.example.icardbackend.common.dto.PageResponse;
 import com.example.icardbackend.leave.dto.LeaveRequestCreateRequest;
 import com.example.icardbackend.leave.dto.LeaveRequestResponse;
 import com.example.icardbackend.leave.entity.LeaveRequest;
+import com.example.icardbackend.leave.entity.LeaveStatus;
 import com.example.icardbackend.leave.mapper.LeaveRequestMapper;
 import com.example.icardbackend.leave.service.LeaveRequestService;
 import com.example.icardbackend.security.userdetails.CustomUserDetails;
@@ -46,19 +47,20 @@ public class LeaveRequestController {
     }
 
     @GetMapping("/api/manager/leaves")
-    @PreAuthorize("hasRole('MANAGER')")
+    @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
     public PageResponse<LeaveRequestResponse> getTeamLeaves(
             @AuthenticationPrincipal CustomUserDetails userDetails,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(required = false) LeaveStatus status) {
 
         List<User> team = userService.getTeamEntities(userDetails.getUser());
-        Page<LeaveRequest> leavePage = leaveRequestService.getTeamLeaves(team, page, size);
+        Page<LeaveRequest> leavePage = leaveRequestService.getTeamLeaves(team, page, size, status);
         return PageResponse.from(leavePage.map(leaveRequestMapper::toResponse));
     }
 
     @PutMapping("/api/manager/leaves/{id}/approve")
-    @PreAuthorize("hasRole('MANAGER')")
+    @PreAuthorize("hasAnyRole('MANAGER','ADMIN')")
     public ResponseEntity<LeaveRequestResponse> approve(
             @PathVariable Long id,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
@@ -68,7 +70,7 @@ public class LeaveRequestController {
     }
 
     @PutMapping("/api/manager/leaves/{id}/reject")
-    @PreAuthorize("hasRole('MANAGER')")
+    @PreAuthorize("hasAnyRole('MANAGER','ADMIN')")
     public ResponseEntity<LeaveRequestResponse> reject(
             @PathVariable Long id,
             @AuthenticationPrincipal CustomUserDetails userDetails) {

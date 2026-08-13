@@ -4,6 +4,7 @@ import com.example.icardbackend.common.exception.AttendanceException.ActiveAtten
 import com.example.icardbackend.common.exception.AttendanceException.NoActiveAttendanceException;
 import com.example.icardbackend.common.exception.DepartmentException.DepartmentAlreadyExistsException;
 import com.example.icardbackend.common.exception.DepartmentException.DepartmentNotFoundException;
+import com.example.icardbackend.common.exception.DepartmentException.ManagerAlreadyAssignedException;
 import com.example.icardbackend.common.exception.LeaveRequestException.LeaveAlreadyDecidedException;
 import com.example.icardbackend.common.exception.LeaveRequestException.LeaveOverlapException;
 import com.example.icardbackend.common.exception.LeaveRequestException.LeaveRequestNotFoundException;
@@ -12,6 +13,7 @@ import com.example.icardbackend.common.exception.QrException.QrAlreadyUsedExcept
 import com.example.icardbackend.common.exception.QrException.QrExpiredException;
 import com.example.icardbackend.common.exception.QrException.QrNotFoundException;
 import com.example.icardbackend.common.exception.UserException.UserNotFoundException;
+import com.example.icardbackend.common.exception.WorkScheduleException.WorkScheduleNotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -160,6 +162,17 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(LeaveAlreadyDecidedException.class)
     public ResponseEntity<ErrorResponse> handleLeaveAlreadyDecided(
             LeaveAlreadyDecidedException ex, HttpServletRequest request) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(buildError(HttpStatus.CONFLICT, ex.getMessage(), request));
+    }
+
+    @ExceptionHandler(WorkScheduleNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleWorkScheduleNotFound(
+            WorkScheduleNotFoundException ex, HttpServletRequest request) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(buildError(HttpStatus.NOT_FOUND, ex.getMessage(), request));
+    }
+    @ExceptionHandler(ManagerAlreadyAssignedException.class)
+    public ResponseEntity<ErrorResponse> handleManagerAlreadyAssigned(
+            ManagerAlreadyAssignedException ex, HttpServletRequest request) {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(buildError(HttpStatus.CONFLICT, ex.getMessage(), request));
     }
 }

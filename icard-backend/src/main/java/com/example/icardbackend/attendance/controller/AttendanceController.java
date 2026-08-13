@@ -12,6 +12,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
@@ -55,5 +56,11 @@ public class AttendanceController {
     public ActiveStatusResponse getActiveStatus(@AuthenticationPrincipal CustomUserDetails userDetails) {
         boolean active =attendanceService.hasActiveAttendance(userDetails.getUser());
         return ActiveStatusResponse.builder().active(active).build();
+    }
+    @PostMapping("/api/admin/attendance/filter")
+    @PreAuthorize("hasRole('ADMIN')")
+    public PageResponse<AttendanceResponse> filterAllAttendance(@RequestBody AttendanceFilterRequest request) {
+        Page<Attendance> page = attendanceService.filterAllAttendance(request);
+        return PageResponse.from(page.map(attendanceMapper::toAttendanceResponse));
     }
 }

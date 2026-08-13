@@ -21,4 +21,6 @@ public class DashboardStatsResponse {
     private Long weeklyCheckOutCount;
     private Double totalWorkedHours;
     private int weeklyLeaveDayCount;
+    private long monthlyLateCount;
+    private double monthlyOvertimeHours;
 }

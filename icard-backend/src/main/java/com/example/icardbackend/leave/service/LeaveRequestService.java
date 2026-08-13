@@ -9,6 +9,7 @@ import com.example.icardbackend.leave.entity.LeaveRequest;
 import com.example.icardbackend.leave.entity.LeaveStatus;
 import com.example.icardbackend.leave.repository.LeaveRequestRepository;
 import com.example.icardbackend.qr.service.MailService;
+import com.example.icardbackend.user.entity.RoleType;
 import com.example.icardbackend.user.entity.User;
 import com.example.icardbackend.user.repository.UserRepository;
 import jakarta.transaction.Transactional;
@@ -73,25 +74,29 @@ public class LeaveRequestService {
         return leaveRequestRepository.findByUser(user);
     }
 
-    public Page<LeaveRequest> getTeamLeaves(List<User> team, int page, int size) {
+    public Page<LeaveRequest> getTeamLeaves(List<User> team, int page, int size, LeaveStatus status) {
         if (team.isEmpty()) {
             return Page.empty();
         }
         Pageable pageable = PageRequest.of(page, size);
+
+        if (status != null) {
+            return leaveRequestRepository.findByUserInAndStatus(team, status, pageable);
+        }
         return leaveRequestRepository.findByUserIn(team, pageable);
     }
 
     @Transactional
-    public LeaveRequest approve(Long leaveRequestId, User manager) {
-        return decide(leaveRequestId, manager, true);
+    public LeaveRequest approve(Long leaveRequestId, User approver) {
+        return decide(leaveRequestId, approver, true);
     }
 
     @Transactional
-    public LeaveRequest reject(Long leaveRequestId, User manager) {
-        return decide(leaveRequestId, manager, false);
+    public LeaveRequest reject(Long leaveRequestId, User approver) {
+        return decide(leaveRequestId, approver, false);
     }
 
-    private LeaveRequest decide(Long leaveRequestId, User manager, boolean approve) {
+    private LeaveRequest decide(Long leaveRequestId, User approver, boolean approve) {
 
         LeaveRequest leaveRequest = leaveRequestRepository.findById(leaveRequestId)
                 .orElseThrow(() -> new LeaveRequestNotFoundException("İzin talebi bulunamadı: " + leaveRequestId));
@@ -101,14 +106,16 @@ public class LeaveRequestService {
         }
 
         boolean isOwnTeamMember = leaveRequest.getUser().getManager() != null
-                && leaveRequest.getUser().getManager().getId().equals(manager.getId());
+                && leaveRequest.getUser().getManager().getId().equals(approver.getId());
 
-        if (!isOwnTeamMember) {
+        boolean isAdmin = approver.getRole() == RoleType.ADMIN;
+
+        if (!isOwnTeamMember && !isAdmin) {
             throw new AccessDeniedException("Sadece kendi ekibinizin izin taleplerini karara bağlayabilirsiniz.");
         }
 
         leaveRequest.setStatus(approve ? LeaveStatus.APPROVED : LeaveStatus.REJECTED);
-        leaveRequest.setApprovedBy(manager);
+        leaveRequest.setApprovedBy(approver);
         leaveRequest.setDecisionDate(LocalDateTime.now());
 
         LeaveRequest saved = leaveRequestRepository.save(leaveRequest);

@@ -6,11 +6,9 @@ import com.example.icardbackend.attendance.dto.WeeklyChartResponse;
 import com.example.icardbackend.attendance.service.DashboardService;
 import com.example.icardbackend.security.userdetails.CustomUserDetails;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
@@ -31,5 +29,13 @@ public class DashboardController {
             @AuthenticationPrincipal CustomUserDetails userDetails,
             @RequestParam(defaultValue = "0") int weekOffset) {
         return dashboardService.getWeeklyChart(userDetails.getUser(), weekOffset);
+    }
+
+    @GetMapping("/department/{id}/weekly-chart")
+    @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
+    public WeeklyChartResponse getDepartmentWeeklyChart(
+            @PathVariable Long id,
+            @RequestParam(defaultValue = "0") int weekOffset) {
+        return dashboardService.getWeeklyChartForDepartment(id, weekOffset);
     }
 }

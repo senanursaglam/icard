@@ -16,6 +16,10 @@ export interface UserResponse {
   lastName: string;
   email: string;
   createdDate: string;
+  role: string;
+  departmentName: string | null;
+  managerFullName: string | null;
+  active: boolean;
 }
 
 export interface AuthResponse {

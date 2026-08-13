@@ -23,7 +23,15 @@ const LoginPage = () => {
   try {
     const response = await loginUser(formData);
     login(response.token, response.user);
-    navigate("/dashboard");
+    if (response.user.role === "MANAGER") {
+      navigate("/manager/team");
+    }
+    if (response.user.role === "ADMIN"){
+      navigate("/admin")
+    }
+     else {
+      navigate("/dashboard");
+    }
   } catch (err: any) {
     const data = err.response?.data;
 

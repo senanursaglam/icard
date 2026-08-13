@@ -18,4 +18,8 @@ public class AttendanceResponse {
     private Long workedMinutes;
     private Double workedHours;
     private AttendanceStatus status;
+    private Boolean isLate;
+    private Long overtimeMinutes;
+    private String userFullName;
+    private Boolean isEarlyLeave;
 }

@@ -17,6 +17,8 @@ public interface LeaveRequestRepository extends JpaRepository<LeaveRequest, Long
     List<LeaveRequest> findByUser(User user);
 
     Page<LeaveRequest> findByUserIn(List<User> users, Pageable pageable);
+    Page<LeaveRequest> findByUserInAndStatus(List<User> users, LeaveStatus status, Pageable pageable);
+
 
     // Çakışma kontrolü: aynı kullanıcının, verilen aralıkla kesişen ve
     // PENDING/APPROVED durumunda olan bir izni var mı?

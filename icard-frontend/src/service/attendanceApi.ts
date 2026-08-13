@@ -48,3 +48,14 @@ export const getActiveStatus = async (): Promise<ActiveStatusResponse> => {
   const response = await axiosInstance.get<ActiveStatusResponse>("/attendance/active-status");
   return response.data;
 };
+
+export const getDepartmentWeeklyChart = async (
+  departmentId: number,
+  weekOffset: number = 0
+): Promise<WeeklyChartResponse> => {
+  const response = await axiosInstance.get<WeeklyChartResponse>(
+    `/dashboard/department/${departmentId}/weekly-chart`,
+    { params: { weekOffset } }
+  );
+  return response.data;
+};

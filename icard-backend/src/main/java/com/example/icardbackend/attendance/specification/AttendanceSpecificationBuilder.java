@@ -1,6 +1,7 @@
 package com.example.icardbackend.attendance.specification;
 
 import com.example.icardbackend.attendance.entity.Attendance;
+import com.example.icardbackend.attendance.entity.AttendanceStatus;
 import com.example.icardbackend.common.specification.FilterCriteria;
 import com.example.icardbackend.user.entity.User;
 import jakarta.persistence.criteria.Predicate;
@@ -43,13 +44,33 @@ public class AttendanceSpecificationBuilder {
 
         String field = criteria.getField();
 
+        if (field.equals("departmentId")) {
+            return switch (criteria.getOperator()) {
+                case EQ -> cb.equal(
+                        root.join("user").join("department").get("id"),
+                        Long.valueOf(criteria.getValue().toString())
+                );
+                case IN -> {
+                    List<Long> ids = criteria.getValues().stream()
+                            .map(v -> Long.valueOf(v.toString()))
+                            .toList();
+                    yield root.join("user").join("department").get("id").in(ids);
+                }
+                default -> null;
+            };
+        }
+
+
         return switch (criteria.getOperator()) {
 
             case EQ -> {
                 if (field.equals("status")) {
                     yield cb.equal(root.get(field), Enum.valueOf(
-                            com.example.icardbackend.attendance.entity.AttendanceStatus.class,
+                            AttendanceStatus.class,
                             criteria.getValue().toString()));
+                }
+                if (field.equals("isLate")) {
+                    yield cb.equal(root.get(field), Boolean.valueOf(criteria.getValue().toString()));
                 }
                 yield cb.equal(root.get(field), criteria.getValue());
             }
@@ -84,6 +105,22 @@ public class AttendanceSpecificationBuilder {
 
             List<Predicate> predicates = new ArrayList<>();
             predicates.add(root.get("user").in(teamMembers));
+
+            if (filters != null) {
+                for (FilterCriteria criteria : filters) {
+                    Predicate predicate = toPredicate(root, cb, criteria);
+                    if (predicate != null) {
+                        predicates.add(predicate);
+                    }
+                }
+            }
+
+            return cb.and(predicates.toArray(new Predicate[0]));
+        };
+    }
+    public Specification<Attendance> buildForAdmin(List<FilterCriteria> filters) {
+        return (root, query, cb) -> {
+            List<Predicate> predicates = new ArrayList<>();
 
             if (filters != null) {
                 for (FilterCriteria criteria : filters) {

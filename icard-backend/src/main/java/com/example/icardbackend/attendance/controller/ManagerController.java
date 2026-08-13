@@ -2,11 +2,13 @@ package com.example.icardbackend.attendance.controller;
 
 import com.example.icardbackend.attendance.dto.AttendanceFilterRequest;
 import com.example.icardbackend.attendance.dto.AttendanceResponse;
+import com.example.icardbackend.attendance.dto.TeamOvertimeSummaryResponse;
 import com.example.icardbackend.attendance.entity.Attendance;
 import com.example.icardbackend.attendance.mapper.AttendanceMapper;
 import com.example.icardbackend.attendance.service.AttendanceService;
 import com.example.icardbackend.common.dto.PageResponse;
 import com.example.icardbackend.security.userdetails.CustomUserDetails;
+import com.example.icardbackend.user.dto.EmployeeDetailResponse;
 import com.example.icardbackend.user.dto.UserResponse;
 import com.example.icardbackend.user.entity.User;
 import com.example.icardbackend.user.service.UserService;
@@ -41,5 +43,20 @@ public class ManagerController {
         List<User> team = userService.getTeamEntities(userDetails.getUser());
         Page<Attendance> page = attendanceService.filterTeamAttendance(team, request);
         return PageResponse.from(page.map(attendanceMapper::toAttendanceResponse));
+    }
+
+    @GetMapping("/team/overtime-summary")
+    public List<TeamOvertimeSummaryResponse> getTeamOvertimeSummary(
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+
+        List<User> team = userService.getTeamEntities(userDetails.getUser());
+        return attendanceService.getTeamOvertimeSummary(team);
+    }
+
+    @GetMapping("/team/{employeeId}")
+    public EmployeeDetailResponse getEmployeeDetail(
+            @PathVariable Long employeeId,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        return userService.getEmployeeDetail(employeeId, userDetails.getUser());
     }
 }

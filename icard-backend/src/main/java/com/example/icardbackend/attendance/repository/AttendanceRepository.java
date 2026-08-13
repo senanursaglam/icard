@@ -79,6 +79,30 @@ public interface AttendanceRepository extends JpaRepository<Attendance, Long>,
     Long sumWorkedMinutesForUsersBetween(@Param("users") List<User> users,
                                          @Param("start") LocalDateTime start,
                                          @Param("end") LocalDateTime end);
+
+    @Query("SELECT COUNT(a) FROM Attendance a WHERE a.user = :user " +
+            "AND a.isLate = true AND a.loginTime >= :start AND a.loginTime < :end")
+    long countLateBetween(@Param("user") User user,
+                          @Param("start") LocalDateTime start,
+                          @Param("end") LocalDateTime end);
+
+    @Query("SELECT COALESCE(SUM(a.overtimeMinutes), 0) FROM Attendance a WHERE a.user = :user " +
+            "AND a.overtimeMinutes IS NOT NULL AND a.loginTime >= :start AND a.loginTime < :end")
+    Long sumOvertimeMinutesBetween(@Param("user") User user,
+                                   @Param("start") LocalDateTime start,
+                                   @Param("end") LocalDateTime end);
+
+
+    @Query("SELECT COALESCE(SUM(a.overtimeMinutes), 0) FROM Attendance a " +
+            "WHERE a.user = :user AND a.overtimeMinutes IS NOT NULL")
+    Long sumAllOvertimeMinutesForUser(@Param("user") User user);
+
+    @Query("SELECT COUNT(a) FROM Attendance a WHERE a.user = :user AND a.isLate = true")
+    long countAllLateForUser(@Param("user") User user);
+
+    List<Attendance> findByUserInAndLoginTimeBetween(List<User> users, LocalDateTime start, LocalDateTime end);
+
+    List<Attendance> findByUserOrderByLoginTimeDesc(User user, Pageable pageable);
 }
 
 

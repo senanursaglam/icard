@@ -2,6 +2,7 @@ export type AttendanceStatus = "ACTIVE" | "COMPLETED";
 
 export interface AttendanceResponse {
   id: number;
+  userFullName: string;
   loginTime: string;
   logoutTime: string | null;
   workedMinutes: number | null;

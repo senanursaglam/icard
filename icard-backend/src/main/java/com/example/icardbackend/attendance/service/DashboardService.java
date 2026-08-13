@@ -5,9 +5,13 @@ import com.example.icardbackend.attendance.dto.DashboardStatsResponse;
 import com.example.icardbackend.attendance.dto.WeeklyChartResponse;
 import com.example.icardbackend.attendance.entity.Attendance;
 import com.example.icardbackend.attendance.repository.AttendanceRepository;
+import com.example.icardbackend.common.exception.DepartmentException.DepartmentNotFoundException;
+import com.example.icardbackend.department.entity.Department;
+import com.example.icardbackend.department.repository.DepartmentRepository;
 import com.example.icardbackend.leave.entity.LeaveRequest;
 import com.example.icardbackend.leave.repository.LeaveRequestRepository;
 import com.example.icardbackend.user.entity.User;
+import com.example.icardbackend.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -23,6 +27,8 @@ public class DashboardService {
 
     private final AttendanceRepository attendanceRepository;
     private final LeaveRequestRepository leaveRequestRepository;
+    private final DepartmentRepository departmentRepository;
+    private final UserRepository userRepository;
 
     public DashboardStatsResponse getStats(User user) {
 
@@ -33,6 +39,9 @@ public class DashboardService {
         LocalDateTime weekStart = weekStartDate.atStartOfDay();
         LocalDateTime weekEnd = weekStart.plusWeeks(1);
 
+        LocalDateTime monthStart = LocalDate.now().withDayOfMonth(1).atStartOfDay();
+        LocalDateTime monthEnd = monthStart.plusMonths(1);
+
         Long todayMinutes = attendanceRepository.sumWorkedMinutesBetween(user, todayStart, todayEnd);
         Long weeklyMinutes = attendanceRepository.sumWorkedMinutesBetween(user, weekStart, weekEnd);
         Long weeklyCheckIns = attendanceRepository.countCheckInsBetween(user, weekStart, weekEnd);
@@ -41,6 +50,9 @@ public class DashboardService {
 
         Set<LocalDate> leaveDates = getApprovedLeaveDates(user, weekStartDate, weekStartDate.plusDays(6));
 
+        long monthlyLateCount = attendanceRepository.countLateBetween(user, monthStart, monthEnd);
+        Long monthlyOvertimeMinutes = attendanceRepository.sumOvertimeMinutesBetween(user, monthStart, monthEnd);
+
         return DashboardStatsResponse.builder()
                 .todayWorkedHours(minutesToHours(todayMinutes))
                 .weeklyWorkedHours(minutesToHours(weeklyMinutes))
@@ -48,6 +60,8 @@ public class DashboardService {
                 .weeklyCheckOutCount(weeklyCheckOuts)
                 .totalWorkedHours(minutesToHours(totalMinutes))
                 .weeklyLeaveDayCount(leaveDates.size())
+                .monthlyLateCount(monthlyLateCount)
+                .monthlyOvertimeHours(minutesToHours(monthlyOvertimeMinutes))
                 .build();
     }
 
@@ -125,6 +139,52 @@ public class DashboardService {
         }
 
         return leaveDates;
+    }
+
+    public WeeklyChartResponse getWeeklyChartForDepartment(Long departmentId, int weekOffset) {
+
+        Department department = departmentRepository.findById(departmentId)
+                .orElseThrow(() -> new DepartmentNotFoundException("Departman bulunamadı: " + departmentId));
+
+        List<User> members = userRepository.findByDepartment(department);
+
+        LocalDate weekStartDate = LocalDate.now()
+                .with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+                .plusWeeks(weekOffset);
+        LocalDateTime weekStart = weekStartDate.atStartOfDay();
+        LocalDateTime weekEnd = weekStart.plusWeeks(1);
+
+        Map<DayOfWeek, Long> minutesByDay = new EnumMap<>(DayOfWeek.class);
+        for (DayOfWeek day : DayOfWeek.values()) {
+            minutesByDay.put(day, 0L);
+        }
+
+        if (!members.isEmpty()) {
+            List<Attendance> attendances = attendanceRepository.findByUserInAndLoginTimeBetween(members, weekStart, weekEnd);
+            for (Attendance a : attendances) {
+                if (a.getWorkedMinutes() != null) {
+                    DayOfWeek day = a.getLoginTime().getDayOfWeek();
+                    minutesByDay.merge(day, a.getWorkedMinutes(), Long::sum);
+                }
+            }
+        }
+
+        String[] labels = {"Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Pazar"};
+        DayOfWeek[] order = {DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
+                DayOfWeek.THURSDAY, DayOfWeek.FRIDAY, DayOfWeek.SATURDAY, DayOfWeek.SUNDAY};
+
+        List<DailyHoursResponse> days = new ArrayList<>();
+        for (int i = 0; i < order.length; i++) {
+            Long minutes = minutesByDay.get(order[i]);
+            double hours = Math.round((minutes / 60.0) * 100.0) / 100.0;
+            days.add(DailyHoursResponse.builder().day(labels[i]).hours(hours).isLeave(false).build());
+        }
+
+        return WeeklyChartResponse.builder()
+                .weekStart(weekStartDate)
+                .weekEnd(weekStartDate.plusDays(6))
+                .days(days)
+                .build();
     }
 
 }

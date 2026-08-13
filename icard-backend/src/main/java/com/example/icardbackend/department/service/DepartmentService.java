@@ -3,6 +3,7 @@ package com.example.icardbackend.department.service;
 import com.example.icardbackend.attendance.repository.AttendanceRepository;
 import com.example.icardbackend.common.exception.DepartmentException.DepartmentAlreadyExistsException;
 import com.example.icardbackend.common.exception.DepartmentException.DepartmentNotFoundException;
+import com.example.icardbackend.common.exception.DepartmentException.ManagerAlreadyAssignedException;
 import com.example.icardbackend.common.exception.UserException.UserNotFoundException;
 import com.example.icardbackend.department.dto.DepartmentRequest;
 import com.example.icardbackend.department.dto.DepartmentStatsResponse;
@@ -35,12 +36,17 @@ public class DepartmentService {
             throw new DepartmentAlreadyExistsException("Bu departman adı zaten kullanılıyor: " + request.getName());
         }
 
+        User manager = resolveManager(request.getManagerId());
+        validateManagerNotAlreadyAssigned(manager, null);
+
         Department department = Department.builder()
                 .name(request.getName())
-                .manager(resolveManager(request.getManagerId()))
+                .manager(manager)
                 .build();
 
-        return departmentRepository.save(department);
+        Department saved = departmentRepository.save(department);
+        syncDepartmentUsersManager(saved);
+        return saved;
     }
 
     public Department update(Long id, DepartmentRequest request) {
@@ -48,10 +54,37 @@ public class DepartmentService {
         Department department = departmentRepository.findById(id)
                 .orElseThrow(() -> new DepartmentNotFoundException("Departman bulunamadı: " + id));
 
-        department.setName(request.getName());
-        department.setManager(resolveManager(request.getManagerId()));
+        User manager = resolveManager(request.getManagerId());
+        validateManagerNotAlreadyAssigned(manager, id);
 
-        return departmentRepository.save(department);
+        department.setName(request.getName());
+        department.setManager(manager);
+
+        Department saved = departmentRepository.save(department);
+        syncDepartmentUsersManager(saved);
+        return saved;
+    }
+
+    private void validateManagerNotAlreadyAssigned(User manager, Long currentDepartmentId) {
+        if (manager == null) return;
+
+        departmentRepository.findByManager(manager).ifPresent(existing -> {
+            if (currentDepartmentId == null || !existing.getId().equals(currentDepartmentId)) {
+                throw new ManagerAlreadyAssignedException(
+                        manager.getFirstName() + " " + manager.getLastName() +
+                                " zaten '" + existing.getName() + "' departmanının yöneticisi.");
+            }
+        });
+    }
+
+    // Departmanın yöneticisi değiştiğinde, o departmandaki tüm kullanıcıların
+// manager alanını da otomatik günceller — tutarlılığı korumak için.
+    private void syncDepartmentUsersManager(Department department) {
+        List<User> members = userRepository.findByDepartment(department);
+        for (User member : members) {
+            member.setManager(department.getManager());
+        }
+        userRepository.saveAll(members);
     }
 
     public java.util.List<Department> getAll() {

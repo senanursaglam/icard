@@ -35,4 +35,15 @@ public class Attendance {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private AttendanceStatus status;
+
+    @Column(nullable = false)
+    @Builder.Default
+    private Boolean isLate = false;
+
+    private Long overtimeMinutes;
+
+    @Column(nullable = false)
+    @Builder.Default
+    private Boolean isEarlyLeave = false;
+
 }
