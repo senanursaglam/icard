@@ -19,11 +19,6 @@ public class AdminUserCreateRequest {
     @Email
     private String email;
 
-    @NotBlank
-    private String password;
-
     private RoleType role;
     private Long departmentId;
-    private Long managerId;
-
 }

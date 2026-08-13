@@ -1,11 +1,11 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import ProtectedRoute from "./ProtectedRoute";
 import LoginPage from "../pages/LoginPage";
-import RegisterPage from "../pages/RegisterPage";
 import DashboardPage from "../pages/DashboardPage";
 import QrScanPage from "../pages/QrScanPage";
 import ManagerTeamPage from "../pages/ManagerTeamPage";
 import AdminPage from "../pages/AdminPage";
+import ChangePasswordPage from "../pages/ChangePasswordPage";
 
 const AppRouter = () => {
   return (
@@ -13,7 +13,6 @@ const AppRouter = () => {
       <Routes>
         <Route path="/" element={<Navigate to="/login" replace />} />
         <Route path="/login" element={<LoginPage />} />
-        <Route path="/register" element={<RegisterPage />} />
         <Route
           path="/dashboard"
           element={
@@ -43,6 +42,14 @@ const AppRouter = () => {
           element={
             <ProtectedRoute allowedRoles={["ADMIN"]}>
               <AdminPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/change-password"
+          element={
+            <ProtectedRoute>
+              <ChangePasswordPage />
             </ProtectedRoute>
           }
         />

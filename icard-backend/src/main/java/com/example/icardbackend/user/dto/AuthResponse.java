@@ -11,4 +11,5 @@ public class AuthResponse { // login başarılı olunca dönecek jwt ve user bil
 
     private String token;
     private UserResponse user;
+    private Boolean temporaryPassword;
 }

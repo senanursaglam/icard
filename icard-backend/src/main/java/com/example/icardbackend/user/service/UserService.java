@@ -8,6 +8,7 @@ import com.example.icardbackend.common.specification.FilterCriteria;
 import com.example.icardbackend.department.entity.Department;
 import com.example.icardbackend.department.repository.DepartmentRepository;
 import com.example.icardbackend.leave.entity.LeaveStatus;
+import com.example.icardbackend.leave.mapper.LeaveRequestMapper;
 import com.example.icardbackend.leave.repository.LeaveRequestRepository;
 import com.example.icardbackend.security.jwt.JwtService;
 import com.example.icardbackend.security.userdetails.CustomUserDetails;
@@ -29,6 +30,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import com.example.icardbackend.common.exception.UserException.EmailAlreadyExistsException;
 import com.example.icardbackend.common.exception.UserException.UserNotFoundException;
+import com.example.icardbackend.qr.service.MailService;
+import java.util.UUID;
 
 import java.util.Collections;
 import java.util.List;
@@ -47,20 +50,7 @@ public class UserService {
     private final AttendanceRepository attendanceRepository;
     private final AttendanceMapper attendanceMapper;
     private final LeaveRequestRepository leaveRequestRepository;
-
-
-    public UserResponse register(RegisterRequest request) {
-
-        if (userRepository.existsByEmail(request.getEmail())) { //dbden bu maile ait kullanıcı var mı diye bakıyor repo aracılığıyla
-            throw new EmailAlreadyExistsException("Bu email adresi zaten kayıtlı: " + request.getEmail());
-        }
-
-        String encodedPassword = passwordEncoder.encode(request.getPassword());
-        User user = userMapper.toEntity(request, encodedPassword); //builder
-        User savedUser = userRepository.save(user);
-
-        return userMapper.toResponse(savedUser); //direkt entity'yi dönmek yerine UserResponse döndük
-    }
+    private final MailService mailService;
 
     public AuthResponse login(LoginRequest request) {
 
@@ -82,29 +72,50 @@ public class UserService {
         return AuthResponse.builder()
                 .token(token)
                 .user(userMapper.toResponse(user))
+                .temporaryPassword(user.getTemporaryPassword())
                 .build();
     }
 
     public UserResponse adminCreateUser(AdminUserCreateRequest request) {
 
         if (userRepository.existsByEmail(request.getEmail())) {
-            throw new EmailAlreadyExistsException("Bu email adresi zaten kayıtlı: " + request.getEmail());
+            throw new EmailAlreadyExistsException(
+                    "Bu email adresi zaten kayıtlı: " + request.getEmail()
+            );
         }
 
         Department department = resolveDepartment(request.getDepartmentId());
+
+        String temporaryPassword = generateTemporaryPassword();
 
         User user = User.builder()
                 .firstName(request.getFirstName())
                 .lastName(request.getLastName())
                 .email(request.getEmail())
-                .password(passwordEncoder.encode(request.getPassword()))
+                .password(passwordEncoder.encode(temporaryPassword))
                 .role(request.getRole() != null ? request.getRole() : RoleType.EMPLOYEE)
                 .department(department)
                 .manager(department != null ? department.getManager() : null)
                 .active(true)
+                .temporaryPassword(true)
                 .build();
 
-        return userMapper.toResponse(userRepository.save(user));
+        User savedUser = userRepository.save(user);
+
+        mailService.sendTemporaryPasswordMail(
+                savedUser.getEmail(),
+                savedUser.getFirstName(),
+                temporaryPassword
+        );
+
+        return userMapper.toResponse(savedUser);
+    }
+
+    private String generateTemporaryPassword() {
+        return UUID.randomUUID()
+                .toString()
+                .replace("-", "")
+                .substring(0, 10);
     }
 
     public UserResponse adminUpdateUser(Long id, AdminUserUpdateRequest request) {
@@ -188,5 +199,21 @@ public class UserService {
                 .lateCount(lateCount)
                 .pendingLeaveCount((int) pendingLeaves)
                 .build();
+    }
+
+    public void changePassword(
+            String email,
+            ChangePasswordRequest request
+    ) {
+
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() ->
+                        new UserNotFoundException("Kullanıcı bulunamadı.")
+                );
+
+        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        user.setTemporaryPassword(false);
+
+        userRepository.save(user);
     }
 }

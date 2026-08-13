@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { loginUser } from "../service/authApi";
 import { useAuth } from "../context/AuthContext";
 import "./Auth.css";
@@ -23,13 +23,14 @@ const LoginPage = () => {
   try {
     const response = await loginUser(formData);
     login(response.token, response.user);
-    if (response.user.role === "MANAGER") {
+
+    if (response.temporaryPassword) {
+      navigate("/change-password");
+    } else if (response.user.role === "MANAGER") {
       navigate("/manager/team");
-    }
-    if (response.user.role === "ADMIN"){
-      navigate("/admin")
-    }
-     else {
+    } else if (response.user.role === "ADMIN") {
+      navigate("/admin");
+    } else {
       navigate("/dashboard");
     }
   } catch (err: any) {
@@ -97,10 +98,6 @@ const LoginPage = () => {
             {loading ? "Giriş yapılıyor..." : "Giriş Yap"}
           </button>
         </form>
-
-        <p className="auth-switch">
-          Hesabın yok mu? <Link to="/register">Kayıt Ol</Link>
-        </p>
       </div>
     </div>
   );

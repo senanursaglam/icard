@@ -88,4 +88,36 @@ public class MailService {
             throw new RuntimeException("İzin karar maili gönderilemedi: " + e.getMessage(), e);
         }
     }
+
+    public void sendTemporaryPasswordMail(
+            String toEmail,
+            String firstName,
+            String temporaryPassword
+    ) {
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true);
+
+            helper.setTo(toEmail);
+            helper.setSubject("ICard iNFODİF - Hesabınız Oluşturuldu");
+
+            helper.setText(
+                    "<h3>ICard hesabınız oluşturuldu</h3>" +
+                            "<p>Merhaba " + firstName + ",</p>" +
+                            "<p>ICard sistemindeki hesabınız yönetici tarafından oluşturulmuştur.</p>" +
+                            "<p><b>Email:</b> " + toEmail + "</p>" +
+                            "<p><b>Geçici Şifreniz:</b> " + temporaryPassword + "</p>" +
+                            "<p>Bu şifre ile giriş yaptıktan sonra kendi şifrenizi belirlemeniz gerekmektedir.</p>",
+                    true
+            );
+
+            mailSender.send(message);
+
+        } catch (MessagingException e) {
+            throw new RuntimeException(
+                    "Geçici şifre maili gönderilemedi: " + e.getMessage(),
+                    e
+            );
+        }
+    }
 }

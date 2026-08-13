@@ -47,6 +47,10 @@ public class User {
     @Builder.Default
     private Boolean active = true;
 
+    @Column(nullable = false)
+    @Builder.Default
+    private Boolean temporaryPassword = true;
+
     @PrePersist
     protected void onCreate() {
         this.createdDate = LocalDateTime.now();

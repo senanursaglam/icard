@@ -20,6 +20,7 @@ export interface UserResponse {
   departmentName: string | null;
   managerFullName: string | null;
   active: boolean;
+  temporaryPassword: boolean;
 }
 
 export interface AuthResponse {

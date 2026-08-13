@@ -447,9 +447,6 @@ const managers = users.filter((u) => u.role === "MANAGER");
               <Form.Item name="email" label="Email" rules={[{ required: true, type: "email" }]}>
                 <Input />
               </Form.Item>
-              <Form.Item name="password" label="Şifre" rules={[{ required: true }]}>
-                <Input.Password />
-              </Form.Item>
             </>
           )}
           <Form.Item name="role" label="Rol">

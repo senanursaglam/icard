@@ -21,4 +21,5 @@ public class UserResponse { //frontende dönecek kullanıcı bilgisi
     private String departmentName;
     private String managerName;
     private Boolean active;
+    private Boolean temporaryPassword;
 }
